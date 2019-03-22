@@ -4,7 +4,7 @@
 ****************************************************
 * Data Science TEC Community 2019
 * Script that obtain informatiom from Meraki API
-* Version: 0.0.3
+* Version: 0.0.4
 * Created: 22-02-2019
 ****************************************************'''
 
@@ -17,38 +17,51 @@ import psycopg2
 # Simple routine to run a query on a database
 def insert(storageProcedure, values):
     # Data Base Configuration
-    connection = psycopg2.connect("dbname='data_meraki' user='postgres' host='localhost' password='Dev98_2017' ")
+    connection = psycopg2.connect("dbname='datameraki' user='panelesfv' host='ec2-18-144-27-14.us-west-1.compute.amazonaws.com' password='P@n3L3sF0v0' port='9876'")
     query = connection.cursor()
+
     # Set query structure
     statement = 'SELECT * FROM ' + storageProcedure +'(' + values + ');'
+    print(statement)
     # Run query
     query.execute(statement)
     connection.commit()
     return
 
 # API Key to conecte with Meraki authentification services.
-api_key = "511c40271fbead284e859697874724ff2060a337"
+API_KEY = "511c40271fbead284e859697874724ff2060a337"
 
 # Information about local divice MR33
-org_id = 848678 
-networkid = 'N_609674799555303190' 
-serialnum = 'Q2PD-N83P-F9DM'
+ORG_ID = 848678 # Organitation id.
+NETWORK_ID = 'N_609674799555303190'  # Network id.
+SERIAL_NUM = 'Q2PD-N83P-F9DM' # Device serial num.
 
 ''' Get all clients and their network usage. '''
-# Get Data.
-clients = meraki.getclients(api_key,serialnum)
-for i in clients:
-    # Clean data.
-    query = "'%s','%s','%s','%s',%s,%s" % (i['id'],i['description'],i['mac'],i['ip'],i['usage']['sent'],i['usage']['recv'])
-    # Call function to insert data.
-    insert('insert_data_clients',query)
-    
+#query = "'%s','%s','%s','%s',%s,%s" % (i['id'],i['description'],i['mac'],i['ip'],i['usage']['sent'],i['usage']['recv']
 
-''' Get all pages that have been accessed and their network usage. '''
-# Get Data.
-#data = meraki.getnetworktrafficstats(api_key, networkid)
-#for i in data:
-    # Clean data.
-    #query =  "'%s','%s',%s,%s,%s,%s,%s" % (i['application'],i['destination'], i['recv'],i['sent'],i['flows'],i['activeTime'],i['numClients'])
-    # Call function to insert data.
-    #insert('insert_data_sites',query)
+### GET applications traffic stats ###
+
+appTraffic = meraki.getnetworktrafficstats(API_KEY, NETWORK_ID)
+
+### GET clients information ###
+clientsInfomation = meraki.getclients(API_KEY,SERIAL_NUM)
+for index in clientsInfomation: 
+  ### GET Information about an specifit client.
+  client = meraki.getclient(API_KEY,NETWORK_ID,index['id'])
+  query = "'%s', '%s','%s', '%s', '%s', '%s','%s', %s, %s, '%s','%s', '%s'" % (
+    index['id'],  # VARCHAR
+    index['description'], # VARCHAR
+    index['mdnsName'],  # VARCHAR
+    index['dhcpHostname'], # VARCHAR
+    index['mac'],   # VARCHAR
+    index['ip'], # VARCHAR
+    index['vlan'], # VARCHAR
+    client['firstSeen'], # INT
+    client['lastSeen'], # INT
+    client['manufacturer'], # VARCHAR
+    client['os'], #VARCHAR
+    client['wirelessCapabilities']) #VARCHAR
+    
+  insert('insert_client',query)
+  break
+  
