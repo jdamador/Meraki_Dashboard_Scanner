@@ -101,7 +101,7 @@ AS $$
 BEGIN
 	-- IF the client exist, only update the last seen time.
 	if (select count(*) from clients where identifier = _id) > 0 THEN
-		Update clients set last_seen = __lastSeen where identifier = _id;
+		Update clients set last_seen = _lastSeen where identifier = _id;
 	-- IF the client doesn't exist, add a new client.
 	else
 		Insert into clients(
