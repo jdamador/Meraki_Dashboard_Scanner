@@ -15,7 +15,9 @@ var express = require('express');
 bodyParser = require('body-parser');
 var app = express();
 const fs = require('fs');
-
+// Config Postgre
+const pg = require('pg');
+const config = require('./config');
 app.use(bodyParser.urlencoded({
 	extended: true
 }));
@@ -29,30 +31,16 @@ app.get('/meraki', function (req, res) {
 });
 
 
-var table = [];
-var contador = 0;
 
 app.post('/meraki', function (req, res) {
 	try {
-		contador = contador + 1;
-		console.log(contador + " - " + req.body.data.apMac);
-		var json = req.body.data;
-		table.push(json);
-		var jsonC = JSON.stringify(table);
-        // TODO:  cambiar este código por uno que inserte en base de datos.
-		fs.writeFile('data.json', jsonC, 'utf8', function (err) {
-			if (err) {
-				return console.log(err);
-			}
-
-		});
-		//var jsoned = JSON.parse(req.body.data);
-		//console.log("56565" + jsoned[0])
-		/*
-				console.log(jsoned);
-				for (i = 0; i < jsoned.probing.length; i++) {
-					console.log("client " + jsoned.probing[i].client_mac + " seen on ap " + jsoned.probing[i].ap_mac + " with rssi " + jsoned.probing[i].rssi + " at " + jsoned.probing[i].last_seen);
-				}*/
+        
+        // Parsing data into JSON
+		var jsoned = JSON.parse(req.body.data);
+        
+        // Insert data into DB
+        insertDataDB(jsoned);
+		
 	} catch (e) {
 		// An error has occured, handle it, by e.g. logging it
 		console.log("Error.  Likely caused by an invalid POST from " + req.connection.remoteAddress + ":");
@@ -61,6 +49,82 @@ app.post('/meraki', function (req, res) {
 	}
 	res.end();
 });
+
+// Insert data into database
+function insertDataDB(data){
+    for (i = 0; i < data.length; i++) {
+        if(insertDevice(data[i].apMac,data[i].apFloors,data[i].apTags)){ 
+            for(j = 0;j < data[i].observations.length; j++){
+                _lat = data[i].observations.location.lat;
+                _lng = data[i].observations.location.lng;
+                _unc = data[i].observations.location.unc;
+                _x = data[i].observations.location.x;
+                _y = data[i].observations.location.y;
+                _seenTime = data[i].observations.seenTime
+                _ssid = data[i].observations.ssid.
+                _os = data[i].observations.os
+                _seenEpoch = data[i].observations.seenEpoch
+                _rssi = data[i].observations.rssi
+                _ipv6 = data[i].observations.ipv6
+                _manufacturer = data[i].observations.manufacturer
+                _mac = data[i].apMac
+                _macDevice = data[i].observations.clientMac
+                // Insert observation
+                insertObservation(_lat,_lng,_unc,_x,_y,_seenTime,_ssid,_os,_seenEpoch,_rssi,_ipv6,_manufacturer,_mac,_macDevice)
+            }
+        }
+    }
+}
+
+// Insert observation
+async function insertObservation(_lat,_lng,_unc,_x,_y,_seenTime,_ssid,_os,_seenEpoch,_rssi,_ipv6,_manufacturer,_mac,_macDevice){
+    return new Promise(r =>{
+        var client = new pg.Client(config);
+        client.connect(err => {
+            if (err){client.end();console.log(err); r(false);   }
+            else {
+                const query = `SELECT insert_observation('${_lat}','${_lng}','${_unc}','${_x}','${_y}','${_seenTime}','${_ssid}'
+                                ,'${_os}','${_seenEpoch}','${_rssi}','${_ipv6}','${_manufacturer}','${_mac}','${_macDevice}')`;
+                client.
+                query(query)
+                .then(() => {
+                    client.end();
+                    r(true);
+                })
+                .catch(e =>{
+                    console.error(e.stack);
+                    client.end();
+                    r(false);
+                });
+            }
+        });
+    });
+}
+
+// Insert device
+async function insertDevice(_appMac,_appFloor,_apTag){
+    return new Promise(r =>{
+        var client = new pg.Client(config);
+        client.connect(err => {
+            if (err){client.end();console.log(err); r(false);   }
+            else {
+                const query = `SELECT insert_device('${_appMac}','${_appFloor}','${_apTag}')`;
+                
+                client.
+                query(query)
+                .then(() => {
+                    client.end();
+                    r(true);
+                })
+                .catch(e =>{
+                    console.error(e.stack);
+                    client.end();
+                    r(false);
+                });
+            }
+        });
+    });
+}
 
 app.listen(listenport);
 console.log("Meraki presence API receiver listening on port " + listenport);
